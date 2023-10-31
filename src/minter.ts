@@ -4,6 +4,7 @@ import { IMinter } from "./interfaces/minter";
 import { HeadlessGraphQLClient } from "./headless-graphql-client";
 import { RecordView, encode } from "@planetarium/bencodex";
 import Decimal from "decimal.js";
+import { FungibleItemId } from "./types/fungible-item-id";
 
 const MEAD_CURRENCY = {
     ticker: "Mead",
@@ -35,16 +36,25 @@ export class Minter implements IMinter {
         return this._account.getAddress();
     }
 
-    mintFungibleItems(recipient: string, items: [[string, number]]): Promise<string> {
-        throw new Error("Method not implemented.");
+    async mintFungibleItem(recipient: string, fungibleItemId: FungibleItemId, count: number): Promise<string> {
+        const action = new RecordView(
+            {
+                type_id: "mint_assets",
+                values: [
+                    [
+                        Address.fromHex(recipient, true).toBytes(),
+                        null,
+                        [Buffer.from(fungibleItemId, "hex"), BigInt(count)],
+                    ],
+                ],
+            },
+            "text"
+        );
+
+        return await this.sendTx(action);
     }
     
     async mintFungibleAssets(recipient: string, amount: Decimal, currency: Currency): Promise<string> {
-        const genesisHash = Buffer.from(
-            await this._client.getGenesisHash(),
-            "hex"
-        );
-        const minter = await this._account.getAddress();
         const action = new RecordView(
             {
                 type_id: "mint_assets",
@@ -61,7 +71,17 @@ export class Minter implements IMinter {
             },
             "text"
         );
+        
+        return await this.sendTx(action);
+    }
+
+    private async sendTx(action: RecordView): Promise<string> {
+        const minter = await this.getMinterAddress();
         const nonce = BigInt(await this._client.getNextTxNonce(minter.toHex()));
+        const genesisHash = Buffer.from(
+            await this._client.getGenesisHash(),
+            "hex"
+        );
         
         const unsignedTx = {
             nonce,
@@ -75,6 +95,7 @@ export class Minter implements IMinter {
         };
         
         const tx = await signTx(unsignedTx, this._account);
+        console.log(Buffer.from(encode(encodeSignedTx(tx))).toString("hex"));
         return this._client.stageTransaction(Buffer.from(encode(encodeSignedTx(tx))).toString("hex"));
     }
 }

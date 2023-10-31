@@ -13,8 +13,9 @@ export interface IMinter {
         currency: Currency,
     ): Promise<TxId>;
 
-    mintFungibleItems(
+    mintFungibleItem(
         recipient: string,
-        items: [[FungibleItemId, number]],
+        fungibleItemId: FungibleItemId,
+        count: number,
     ): Promise<TxId>;
 }
