@@ -1,8 +1,8 @@
 import { Account, Address } from "@planetarium/account";
 import { Currency, encodeCurrency, encodeSignedTx, signTx } from "@planetarium/tx";
-import { IMinter } from "./interfaces/minter";
+import { IFungibleAssetValues, IFungibleItems, IMinter } from "./interfaces/minter";
 import { HeadlessGraphQLClient } from "./headless-graphql-client";
-import { RecordView, encode } from "@planetarium/bencodex";
+import { RecordView, Value, encode } from "@planetarium/bencodex";
 import Decimal from "decimal.js";
 import { FungibleItemId } from "./types/fungible-item-id";
 
@@ -32,21 +32,11 @@ export class Minter implements IMinter {
         this._client = client;
     }
     
-    getMinterAddress(): Promise<Address> {
-        return this._account.getAddress();
-    }
-
-    async mintFungibleItem(recipient: string, fungibleItemId: FungibleItemId, count: number): Promise<string> {
-        const action = new RecordView(
+    async mintAssets(assets: [IFungibleAssetValues | IFungibleItems]): Promise<string> {
+        const action = new RecordView(            
             {
                 type_id: "mint_assets",
-                values: [
-                    [
-                        Address.fromHex(recipient, true).toBytes(),
-                        null,
-                        [Buffer.from(fungibleItemId, "hex"), BigInt(count)],
-                    ],
-                ],
+                values: assets.map(encodeMintSpec),
             },
             "text"
         );
@@ -54,25 +44,8 @@ export class Minter implements IMinter {
         return await this.sendTx(action);
     }
     
-    async mintFungibleAssets(recipient: string, amount: Decimal, currency: Currency): Promise<string> {
-        const action = new RecordView(
-            {
-                type_id: "mint_assets",
-                values: [
-                    [
-                        Address.fromHex(recipient, true).toBytes(),
-                        [
-                            encodeCurrency(currency),
-                            BigInt(amount.toNumber()),
-                        ],
-                        null,
-                    ],
-                ],
-            },
-            "text"
-        );
-        
-        return await this.sendTx(action);
+    getMinterAddress(): Promise<Address> {
+        return this._account.getAddress();
     }
 
     private async sendTx(action: RecordView): Promise<string> {
@@ -97,5 +70,26 @@ export class Minter implements IMinter {
         const tx = await signTx(unsignedTx, this._account);
         console.log(Buffer.from(encode(encodeSignedTx(tx))).toString("hex"));
         return this._client.stageTransaction(Buffer.from(encode(encodeSignedTx(tx))).toString("hex"));
+    }
+}
+
+function encodeMintSpec(value: IFungibleAssetValues | IFungibleItems): Value {
+    if ((value as IFungibleAssetValues).currency !== undefined) {
+        const favs = value as IFungibleAssetValues;
+        return [
+            Address.fromHex(favs.recipient, true).toBytes(),
+            [
+                encodeCurrency(favs.currency),
+                BigInt(favs.amount.toNumber()),
+            ],
+            null
+        ];
+    } else {
+        const fis = value as IFungibleItems;
+        return [
+            Address.fromHex(fis.recipient, true).toBytes(),
+            null,
+            [Buffer.from(fis.fungibleItemId, "hex"), BigInt(fis.count)],
+        ]
     }
 }

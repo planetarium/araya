@@ -3,9 +3,11 @@ import { NCGTransferredMonitor } from './monitors/ncg-transferred-monitor';
 import { HeadlessGraphQLClient } from './headless-graphql-client';
 import { IMonitorStateStore } from './interfaces/monitor-state-store';
 import { Sqlite3MonitorStateStore } from './sqlite3-monitor-state-store';
-import { LockObserver } from './observers/lock-observer';
+import { NCGObserver } from './observers/ncg-observer';
 import { Minter } from './minter';
-import { RawPrivateKey } from '@planetarium/account';
+import { Address, RawPrivateKey } from '@planetarium/account';
+import { GarageUnloadMonitor } from './monitors/garage-unload-monitor';
+import { GarageObserver } from './observers/garage-observer';
 
 (async() => {
     const upstreamGQLClient = new HeadlessGraphQLClient(
@@ -20,11 +22,17 @@ import { RawPrivateKey } from '@planetarium/account';
         process.env.MONITOR_STATE_STORE_PATH
     );
     
-    const nineChroniclesMonitor = new NCGTransferredMonitor(
+    const ncgMonitor = new NCGTransferredMonitor(
         await monitorStateStore.load("nineChronicles"),
         upstreamGQLClient,
-        process.env.NC_VAULT_ADDRESS
+        Address.fromHex(process.env.NC_VAULT_ADDRESS)
     );
+    const garageMonitor = new GarageUnloadMonitor(
+        await monitorStateStore.load("nineChronicles"),
+        upstreamGQLClient,
+        Address.fromHex(process.env.NC_VAULT_ADDRESS),
+        Address.fromHex(process.env.NC_VAULT_AVATAR_ADDRESS)
+    )
 
     const upstreamAccount = RawPrivateKey.fromHex(
         process.env.NC_UPSTREAM_PRIVATE_KEY
@@ -38,14 +46,17 @@ import { RawPrivateKey } from '@planetarium/account';
         downstreamGQLClient
     );
     
-    nineChroniclesMonitor.attach(
-        new LockObserver(
+    ncgMonitor.attach(
+        new NCGObserver(
             monitorStateStore, 
             minter
         )
     );
 
-    nineChroniclesMonitor.run();    
+    garageMonitor.attach(new GarageObserver(monitorStateStore, minter));
+
+    ncgMonitor.run();
+    garageMonitor.run();
 })().catch(error => {
     console.error(error);
     process.exit(-1);

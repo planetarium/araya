@@ -1,15 +1,16 @@
+import { Address } from "@planetarium/account";
 import { IHeadlessGraphQLClient } from "../interfaces/headless-graphql-client";
 import { NCGTransferredEvent } from "../types/ncg-transferred-event";
 import { TransactionLocation } from "../types/transaction-location";
 import { NineChroniclesMonitor } from "./ninechronicles-block-monitor";
 
 export class NCGTransferredMonitor extends NineChroniclesMonitor<NCGTransferredEvent> {
-    private readonly _address: string;
+    private readonly _address: Address;
 
     constructor(
         latestTransactionLocation: TransactionLocation | null,
         headlessGraphQLClient: IHeadlessGraphQLClient,
-        address: string
+        address: Address
     ) {
         super(latestTransactionLocation, headlessGraphQLClient);
         this._address = address;

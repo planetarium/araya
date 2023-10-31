@@ -2,6 +2,10 @@ import axios, { AxiosResponse } from "axios";
 import { IHeadlessGraphQLClient } from "./interfaces/headless-graphql-client";
 import { NCGTransferredEvent } from "./types/ncg-transferred-event";
 import { BlockHash } from "./types/block-hash";
+import { GarageUnloadEvent } from "./types/garage-unload-event";
+import { BencodexDictionary, Dictionary, Value, decode } from "@planetarium/bencodex";
+import { Address } from "@planetarium/account";
+import { FungibleItemId } from "./types/fungible-item-id";
 
 function delay(ms: number): Promise<void> {
     return new Promise((resolve) => {
@@ -24,6 +28,45 @@ export class HeadlessGraphQLClient implements IHeadlessGraphQLClient {
     constructor(apiEndpoint: string, maxRetry: number) {
         this._apiEndpoint = apiEndpoint;
         this._maxRetry = maxRetry;
+    }
+
+    async getGarageUnloadEvents(blockIndex: number, agentAddress: Address, avatarAddress: Address): Promise<GarageUnloadEvent[]> {
+        const query = `query GetGarageUnloads($startingBlockIndex: Long!, $limit: Long!){
+            transaction{
+              ncTransactions(startingBlockIndex: $startingBlockIndex, actionType: "unload_from_my_garages*" limit: $limit){
+                id
+                actions {
+                  raw
+                }
+              }
+            }
+          }`;
+        const { data } = await this.graphqlRequest({
+            query,
+            operationName: "GetGarageUnloads",
+            variables: {
+                startingBlockIndex: blockIndex,
+                limit: 1
+            }
+        });
+
+        return data.data.transaction.ncTransactions.map(tx => {
+            const action = decode(Buffer.from(tx.actions[0].raw, "hex")) as Dictionary;
+            const values = (action.get("values") as Dictionary).get("l");
+            const recipientAvatarAddress = Address.fromBytes(values[0]);
+            const fungibleAssetValues = (values[1] as []).map(args => [Address.fromBytes(args[0]), args[1]]);
+            const fungibleItems = (values[2] as []).map(args => [recipientAvatarAddress, Buffer.from(args[0]).toString("hex"), args[1]]);
+            const memo = values[3];
+
+            return (!recipientAvatarAddress.equals(avatarAddress) && fungibleAssetValues.filter(fav => fav[0].equals(agentAddress)).length == 0)
+                ? null 
+                : {
+                    txId: tx.id,
+                    fungibleAssetValues,
+                    fungibleItems,
+                    memo,
+                };
+        }).filter(ev => ev !== null);
     }
 
     get endpoint(): string {
@@ -72,14 +115,14 @@ export class HeadlessGraphQLClient implements IHeadlessGraphQLClient {
 
     async getNCGTransferredEvents(
         blockHash: string,
-        recipient: string | null = null
+        recipient: Address | null = null
     ): Promise<NCGTransferredEvent[]> {
         const query = `query GetNCGTransferEvents($blockHash: ByteString!, $recipient: Address!)
         { transferNCGHistories(blockHash: $blockHash, recipient: $recipient) { blockHash txId sender recipient amount memo } }`;
         const { data } = await this.graphqlRequest({
             operationName: "GetNCGTransferEvents",
             query,
-            variables: { blockHash, recipient },
+            variables: { blockHash, recipient: recipient.toHex() },
         });
 
         return data.data.transferNCGHistories;

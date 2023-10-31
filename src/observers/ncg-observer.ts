@@ -7,7 +7,7 @@ import { TransactionLocation } from "../types/transaction-location";
 import { Currency } from "@planetarium/tx";
 import Decimal from "decimal.js";
 
-export class LockObserver implements IObserver<{
+export class NCGObserver implements IObserver<{
     blockHash: BlockHash,
     events: (NCGTransferredEvent & TransactionLocation)[];
 }>
@@ -38,7 +38,7 @@ export class LockObserver implements IObserver<{
                 maximumSupply: null
             };
             const ncgAmount = new Decimal(amount).mul(100).floor();
-            await this._minter.mintFungibleAssets(recipient, ncgAmount, ncg);
+            await this._minter.mintAssets([{ recipient, amount: ncgAmount, currency: ncg }]);
         }
     }
 }
