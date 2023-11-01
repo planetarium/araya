@@ -33,16 +33,16 @@ export class GarageObserver implements IObserver<{
             for (const fa of fungibleAssets) {
                 requests.push({
                     recipient: agentAddress,
-                    currency: fa[0],
-                    amount: fa[1],
+                    currency: fa[1],
+                    amount: fa[2],
                 })
             }
 
             for (const fi of fungibleItems) {
                 requests.push({
                     recipient: avatarAddress,
-                    fungibleItemId: fi[0],
-                    count: fi[1],
+                    fungibleItemId: fi[1],
+                    count: fi[2],
                 })
             }
 
