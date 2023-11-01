@@ -20,7 +20,7 @@ export class GarageObserver implements IObserver<{
     async notify(data: { blockHash: BlockHash; events: (GarageUnloadEvent & TransactionLocation)[]; }): Promise<void> {
         const { events } = data;
 
-        for ( const {blockHash, txId, fungibleAssets, fungibleItems, memo} of events)
+        for ( const {blockHash, txId, fungibleAssetValues, fungibleItems, memo} of events)
         {
             await this._monitorStateStore.store("nine-chronicles", {
                 blockHash,
@@ -30,11 +30,10 @@ export class GarageObserver implements IObserver<{
             const { agentAddress, avatarAddress } = parseMemo(memo);
 
             const requests: (IFungibleAssetValues | IFungibleItems)[] = [];
-            for (const fa of fungibleAssets) {
+            for (const fa of fungibleAssetValues) {
                 requests.push({
                     recipient: agentAddress,
-                    currency: fa[1],
-                    amount: fa[2],
+                    amount: fa[1],
                 })
             }
 

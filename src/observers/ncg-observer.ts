@@ -30,15 +30,15 @@ export class NCGObserver implements IObserver<{
                 txId,
             });
 
-            const ncg: Currency = {
+            const currency: Currency = {
                 decimalPlaces: 0x02,
                 minters: new Set([(await this._minter.getMinterAddress()).toBytes()]),
                 ticker: "NCG",
                 totalSupplyTrackable: false,
                 maximumSupply: null
             };
-            const ncgAmount = new Decimal(amount).mul(100).floor();
-            await this._minter.mintAssets([{ recipient, amount: ncgAmount, currency: ncg }]);
+            const rawValue = BigInt(new Decimal(amount).mul(100).floor().toNumber());
+            await this._minter.mintAssets([{ recipient, amount: {currency, rawValue } }]);
         }
     }
 }

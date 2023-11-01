@@ -5,7 +5,8 @@ import { BlockHash } from "./types/block-hash";
 import { GarageUnloadEvent } from "./types/garage-unload-event";
 import { BencodexDictionary, Dictionary, Value, decode } from "@planetarium/bencodex";
 import { Address } from "@planetarium/account";
-import { FungibleItemId } from "./types/fungible-item-id";
+import { Currency, FungibleAssetValue } from "@planetarium/tx";
+import Decimal from "decimal.js";
 
 function delay(ms: number): Promise<void> {
     return new Promise((resolve) => {
@@ -54,11 +55,22 @@ export class HeadlessGraphQLClient implements IHeadlessGraphQLClient {
             const action = decode(Buffer.from(tx.actions[0].raw, "hex")) as Dictionary;
             const values = (action.get("values") as Dictionary).get("l");
             const recipientAvatarAddress = Address.fromBytes(values[0]);
-            const fungibleAssetValues = (values[1] as []).map(args => [Address.fromBytes(args[0]), args[1]]);
-            const fungibleItems = (values[2] as []).map(args => [recipientAvatarAddress, Buffer.from(args[0]).toString("hex"), args[1]]);
+            const fungibleAssetValues: [Address, FungibleAssetValue][] =
+                (values[1] as []).map(args => [
+                    Address.fromBytes(args[0]),
+                    {
+                        currency: decodeCurrency(args[1][0]),
+                        rawValue: args[1][1],
+                    }
+                ]);
+            const fungibleItems: [Address, string, number][] =
+                (values[2] as []).map(args => [
+                    recipientAvatarAddress,
+                    Buffer.from(args[0]).toString("hex"),
+                    args[1]]);
             const memo = values[3];
 
-            return (!recipientAvatarAddress.equals(avatarAddress) && fungibleAssetValues.filter(fav => fav[0].equals(agentAddress)).length == 0)
+            return (!recipientAvatarAddress.equals(avatarAddress) && fungibleAssetValues.filter(fav => agentAddress.equals(fav[0])).length == 0)
                 ? null 
                 : {
                     txId: tx.id,
@@ -190,3 +202,15 @@ export class HeadlessGraphQLClient implements IHeadlessGraphQLClient {
         }
     }
 }
+
+function decodeCurrency(bdict: BencodexDictionary): Currency {
+    const dpAsHex = (bdict.get("decimalPlaces") as Buffer).toString("hex");
+    return {
+        ticker: bdict.get("ticker").valueOf() as string,
+        decimalPlaces: parseInt(`0x${dpAsHex}`),
+        totalSupplyTrackable: false,
+        minters: bdict.get("minters")?.valueOf() as Set<Uint8Array> ?? null,
+        maximumSupply: null
+    };
+}
+

@@ -1,14 +1,12 @@
-import { Currency } from "@planetarium/tx";
+import { FungibleAssetValue } from "@planetarium/tx";
 import { TxId } from "../types/txid";
 import { FungibleItemId } from "../types/fungible-item-id";
 import { Address } from "@planetarium/account";
-import Decimal from "decimal.js";
 
 export interface IFungibleAssetValues
 {
     recipient: string,
-    amount: Decimal,
-    currency: Currency,
+    amount: FungibleAssetValue,
 }
 
 export interface IFungibleItems

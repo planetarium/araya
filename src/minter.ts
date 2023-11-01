@@ -1,10 +1,8 @@
 import { Account, Address } from "@planetarium/account";
-import { Currency, encodeCurrency, encodeSignedTx, signTx } from "@planetarium/tx";
+import { encodeCurrency, encodeSignedTx, signTx } from "@planetarium/tx";
 import { IFungibleAssetValues, IFungibleItems, IMinter } from "./interfaces/minter";
 import { HeadlessGraphQLClient } from "./headless-graphql-client";
 import { RecordView, Value, encode } from "@planetarium/bencodex";
-import Decimal from "decimal.js";
-import { FungibleItemId } from "./types/fungible-item-id";
 
 const MEAD_CURRENCY = {
     ticker: "Mead",
@@ -68,19 +66,18 @@ export class Minter implements IMinter {
         };
         
         const tx = await signTx(unsignedTx, this._account);
-        console.log(Buffer.from(encode(encodeSignedTx(tx))).toString("hex"));
         return this._client.stageTransaction(Buffer.from(encode(encodeSignedTx(tx))).toString("hex"));
     }
 }
 
 function encodeMintSpec(value: IFungibleAssetValues | IFungibleItems): Value {
-    if ((value as IFungibleAssetValues).currency !== undefined) {
+    if ((value as IFungibleAssetValues).amount !== undefined) {
         const favs = value as IFungibleAssetValues;
         return [
             Address.fromHex(favs.recipient, true).toBytes(),
             [
-                encodeCurrency(favs.currency),
-                BigInt(favs.amount.toNumber()),
+                encodeCurrency(favs.amount.currency),
+                favs.amount.rawValue,
             ],
             null
         ];
