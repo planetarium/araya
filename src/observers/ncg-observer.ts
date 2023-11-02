@@ -32,7 +32,7 @@ export class NCGObserver implements IObserver<{
 
             const currency: Currency = {
                 decimalPlaces: 0x02,
-                minters: new Set([(await this._minter.getMinterAddress()).toBytes()]),
+                minters: null,
                 ticker: "NCG",
                 totalSupplyTrackable: false,
                 maximumSupply: null
