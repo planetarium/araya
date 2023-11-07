@@ -6,7 +6,7 @@ import { GarageUnloadEvent } from "./types/garage-unload-event";
 import { BencodexDictionary, Dictionary, Value, decode } from "@planetarium/bencodex";
 import { Address } from "@planetarium/account";
 import { Currency, FungibleAssetValue } from "@planetarium/tx";
-import Decimal from "decimal.js";
+import { AssetBurntEvent } from "./types/asset-burnt-event";
 
 function delay(ms: number): Promise<void> {
     return new Promise((resolve) => {
@@ -31,9 +31,47 @@ export class HeadlessGraphQLClient implements IHeadlessGraphQLClient {
         this._maxRetry = maxRetry;
     }
 
+    async getAssetBurntEvents(blockIndex: number): Promise<AssetBurntEvent[]> {
+        const query = `query GetAssetBurnt($startingBlockIndex: Long!, $limit: Long!){
+            transaction {
+                ncTransactions(startingBlockIndex: $startingBlockIndex, actionType: "burn_asset*", limit: $limit){
+                    id
+                    actions {
+                        raw
+                    }
+                }
+            }
+        }`;
+        const { data } = await this.graphqlRequest({
+            query,
+            operationName: "GetAssetBurnt",
+            variables: {
+                startingBlockIndex: blockIndex,
+                limit: 1,
+            }
+        });
+
+        return data.data.transaction.ncTransactions.map(tx => {
+            const action = decode(Buffer.from(tx.actions[0].raw, "hex")) as Dictionary;
+            const [_, amount, memo] = (action.get("values") as [Value, BencodexDictionary, string]);
+
+            if (memo.length !== 40) {
+                return null;
+            }
+
+            return {
+                amount: {
+                    currency: decodeCurrency(amount[0]),
+                    rawValue: amount[1]
+                },
+                memo,
+            };
+        }).filter(ev => ev !== null);
+    }
+
     async getGarageUnloadEvents(blockIndex: number, agentAddress: Address, avatarAddress: Address): Promise<GarageUnloadEvent[]> {
         const query = `query GetGarageUnloads($startingBlockIndex: Long!, $limit: Long!){
-            transaction{
+            transaction {
               ncTransactions(startingBlockIndex: $startingBlockIndex, actionType: "unload_from_my_garages*" limit: $limit){
                 id
                 actions {
@@ -47,7 +85,7 @@ export class HeadlessGraphQLClient implements IHeadlessGraphQLClient {
             operationName: "GetGarageUnloads",
             variables: {
                 startingBlockIndex: blockIndex,
-                limit: 1
+                limit: 1,
             }
         });
 

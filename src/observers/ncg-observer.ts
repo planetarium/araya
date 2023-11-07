@@ -7,6 +7,14 @@ import { TransactionLocation } from "../types/transaction-location";
 import { Currency } from "@planetarium/tx";
 import Decimal from "decimal.js";
 
+export const NCG: Currency = {
+    decimalPlaces: 0x02,
+    minters: null,
+    ticker: "NCG",
+    totalSupplyTrackable: false,
+    maximumSupply: null
+};
+
 export class NCGObserver implements IObserver<{
     blockHash: BlockHash,
     events: (NCGTransferredEvent & TransactionLocation)[];
@@ -30,15 +38,8 @@ export class NCGObserver implements IObserver<{
                 txId,
             });
 
-            const currency: Currency = {
-                decimalPlaces: 0x02,
-                minters: null,
-                ticker: "NCG",
-                totalSupplyTrackable: false,
-                maximumSupply: null
-            };
             const rawValue = BigInt(new Decimal(amount).mul(100).floor().toNumber());
-            await this._minter.mintAssets([{ recipient, amount: {currency, rawValue } }]);
+            await this._minter.mintAssets([{ recipient, amount: {currency: NCG, rawValue } }]);
         }
     }
 }

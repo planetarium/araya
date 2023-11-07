@@ -3,22 +3,7 @@ import { encodeCurrency, encodeSignedTx, signTx } from "@planetarium/tx";
 import { IFungibleAssetValues, IFungibleItems, IMinter } from "./interfaces/minter";
 import { HeadlessGraphQLClient } from "./headless-graphql-client";
 import { RecordView, Value, encode } from "@planetarium/bencodex";
-
-const MEAD_CURRENCY = {
-    ticker: "Mead",
-    decimalPlaces: 18,
-    minters: null,
-    totalSupplyTrackable: false,
-    maximumSupply: null,
-};
-
-const additionalGasTxProperties = {
-    maxGasPrice: {
-        currency: MEAD_CURRENCY,
-        rawValue: 10n ** 18n,
-    },
-    gasLimit: 4n,
-};
+import { additionalGasTxProperties } from "./tx";
 
 
 export class Minter implements IMinter {
