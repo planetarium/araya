@@ -8,7 +8,6 @@ import { additionalGasTxProperties } from "./tx";
 export class AssetTransfer implements IAssetTransfer {
     private readonly _client:  IHeadlessGraphQLClient;
     private readonly _account: Account;
-    private readonly _ncgMinters: [Address];
 
     constructor(account: Account, client: IHeadlessGraphQLClient) {
         this._account = account;
@@ -22,6 +21,7 @@ export class AssetTransfer implements IAssetTransfer {
                 type_id: "transfer_asset5",
                 values: {
                     amount: [
+                        // FIXME extract this currency to configure
                         new RecordView(
                             {
                                 decimalPlaces: Buffer.from([0x02]),

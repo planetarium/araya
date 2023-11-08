@@ -1,10 +1,10 @@
 import { Address } from "@planetarium/account";
 import { IHeadlessGraphQLClient } from "../interfaces/headless-graphql-client";
-import { NCGTransferredEvent } from "../types/ncg-transferred-event";
 import { TransactionLocation } from "../types/transaction-location";
 import { NineChroniclesMonitor } from "./ninechronicles-block-monitor";
+import { AssetTransferredEvent } from "../types/asset-transferred-event";
 
-export class NCGTransferredMonitor extends NineChroniclesMonitor<NCGTransferredEvent> {
+export class AssetsTransferredMonitor extends NineChroniclesMonitor<AssetTransferredEvent> {
     private readonly _address: Address;
 
     constructor(
@@ -18,13 +18,13 @@ export class NCGTransferredMonitor extends NineChroniclesMonitor<NCGTransferredE
 
     protected async getEvents(
         blockIndex: number
-    ): Promise<(NCGTransferredEvent & TransactionLocation)[]> {
+    ): Promise<(AssetTransferredEvent & TransactionLocation)[]> {
         const blockHash = await this._headlessGraphQLClient.getBlockHash(
             blockIndex
         );
-        return await this._headlessGraphQLClient.getNCGTransferredEvents(
-            blockHash,
+        return (await this._headlessGraphQLClient.getAssetTransferredEvents(
+            blockIndex,
             this._address
-        );
+        )).map(ev => { return { blockHash, ...ev }});
     }
 }

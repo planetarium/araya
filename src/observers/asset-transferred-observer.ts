@@ -2,22 +2,13 @@ import { IObserver } from ".";
 import { IMonitorStateStore } from "../interfaces/monitor-state-store";
 import { IMinter } from "../interfaces/minter";
 import { BlockHash } from "../types/block-hash";
-import { NCGTransferredEvent } from "../types/ncg-transferred-event";
 import { TransactionLocation } from "../types/transaction-location";
-import { Currency } from "@planetarium/tx";
-import Decimal from "decimal.js";
+import { AssetTransferredEvent } from "../types/asset-transferred-event";
+import { FungibleAssetValue } from "@planetarium/tx";
 
-export const NCG: Currency = {
-    decimalPlaces: 0x02,
-    minters: null,
-    ticker: "NCG",
-    totalSupplyTrackable: false,
-    maximumSupply: null
-};
-
-export class NCGObserver implements IObserver<{
+export class AssetTransferredObserver implements IObserver<{
     blockHash: BlockHash,
-    events: (NCGTransferredEvent & TransactionLocation)[];
+    events: (AssetTransferredEvent & TransactionLocation)[];
 }>
 {
     private readonly _monitorStateStore: IMonitorStateStore;
@@ -28,7 +19,7 @@ export class NCGObserver implements IObserver<{
         this._minter = minter;
     }
 
-    async notify(data: { blockHash: BlockHash; events: (NCGTransferredEvent & TransactionLocation)[]; }): Promise<void> {
+    async notify(data: { blockHash: BlockHash; events: (AssetTransferredEvent & TransactionLocation)[]; }): Promise<void> {
         const { events } = data;
 
         for ( const {blockHash, txId, amount, memo: recipient} of events)
@@ -38,8 +29,18 @@ export class NCGObserver implements IObserver<{
                 txId,
             });
 
-            const rawValue = BigInt(new Decimal(amount).mul(100).floor().toNumber());
-            await this._minter.mintAssets([{ recipient, amount: {currency: NCG, rawValue } }]);
+            // TODO check memo & refund if needed.
+            
+            // Strip minters to mint well.
+            const amountToMint:FungibleAssetValue = {
+                currency: {
+                    ...amount.currency,
+                    minters: null,
+                },
+                rawValue: amount.rawValue,
+            };
+
+            await this._minter.mintAssets([{ recipient, amount: amountToMint }]);
         }
     }
 }

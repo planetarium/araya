@@ -1,9 +1,9 @@
 import 'dotenv/config';
-import { NCGTransferredMonitor } from './monitors/ncg-transferred-monitor';
+import { AssetsTransferredMonitor } from './monitors/assets-transferred-monitor';
 import { HeadlessGraphQLClient } from './headless-graphql-client';
 import { IMonitorStateStore } from './interfaces/monitor-state-store';
 import { Sqlite3MonitorStateStore } from './sqlite3-monitor-state-store';
-import { NCGObserver } from './observers/ncg-observer';
+import { AssetTransferredObserver } from './observers/asset-transferred-observer';
 import { Minter } from './minter';
 import { Address, RawPrivateKey } from '@planetarium/account';
 import { GarageUnloadMonitor } from './monitors/garage-unload-monitor';
@@ -22,7 +22,7 @@ import { GarageObserver } from './observers/garage-observer';
         process.env.MONITOR_STATE_STORE_PATH
     );
     
-    const ncgMonitor = new NCGTransferredMonitor(
+    const assetsTransferredMonitorMonitor = new AssetsTransferredMonitor(
         await monitorStateStore.load("nineChronicles"),
         upstreamGQLClient,
         Address.fromHex(process.env.NC_VAULT_ADDRESS)
@@ -46,8 +46,8 @@ import { GarageObserver } from './observers/garage-observer';
         downstreamGQLClient
     );
     
-    ncgMonitor.attach(
-        new NCGObserver(
+    assetsTransferredMonitorMonitor.attach(
+        new AssetTransferredObserver(
             monitorStateStore, 
             minter
         )
@@ -55,7 +55,7 @@ import { GarageObserver } from './observers/garage-observer';
 
     garageMonitor.attach(new GarageObserver(monitorStateStore, minter));
 
-    ncgMonitor.run();
+    assetsTransferredMonitorMonitor.run();
     garageMonitor.run();
 })().catch(error => {
     console.error(error);

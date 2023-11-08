@@ -1,12 +1,12 @@
 import axios, { AxiosResponse } from "axios";
 import { IHeadlessGraphQLClient } from "./interfaces/headless-graphql-client";
-import { NCGTransferredEvent } from "./types/ncg-transferred-event";
 import { BlockHash } from "./types/block-hash";
 import { GarageUnloadEvent } from "./types/garage-unload-event";
-import { BencodexDictionary, Dictionary, Value, decode } from "@planetarium/bencodex";
+import { BencodexDictionary, Dictionary, Value, decode, encode } from "@planetarium/bencodex";
 import { Address } from "@planetarium/account";
 import { Currency, FungibleAssetValue } from "@planetarium/tx";
 import { AssetBurntEvent } from "./types/asset-burnt-event";
+import { AssetTransferredEvent } from "./types/asset-transferred-event";
 
 function delay(ms: number): Promise<void> {
     return new Promise((resolve) => {
@@ -32,9 +32,9 @@ export class HeadlessGraphQLClient implements IHeadlessGraphQLClient {
     }
 
     async getAssetBurntEvents(blockIndex: number): Promise<AssetBurntEvent[]> {
-        const query = `query GetAssetBurnt($startingBlockIndex: Long!, $limit: Long!){
+        const query = `query GetAssetBurnt($startingBlockIndex: Long!){
             transaction {
-                ncTransactions(startingBlockIndex: $startingBlockIndex, actionType: "burn_asset*", limit: $limit){
+                ncTransactions(startingBlockIndex: $startingBlockIndex, actionType: "burn_asset*", limit: 1){
                     id
                     actions {
                         raw
@@ -47,7 +47,6 @@ export class HeadlessGraphQLClient implements IHeadlessGraphQLClient {
             operationName: "GetAssetBurnt",
             variables: {
                 startingBlockIndex: blockIndex,
-                limit: 1,
             }
         });
 
@@ -70,9 +69,9 @@ export class HeadlessGraphQLClient implements IHeadlessGraphQLClient {
     }
 
     async getGarageUnloadEvents(blockIndex: number, agentAddress: Address, avatarAddress: Address): Promise<GarageUnloadEvent[]> {
-        const query = `query GetGarageUnloads($startingBlockIndex: Long!, $limit: Long!){
+        const query = `query GetGarageUnloads($startingBlockIndex: Long!){
             transaction {
-              ncTransactions(startingBlockIndex: $startingBlockIndex, actionType: "unload_from_my_garages*" limit: $limit){
+              ncTransactions(startingBlockIndex: $startingBlockIndex, actionType: "unload_from_my_garages*" limit: 1){
                 id
                 actions {
                   raw
@@ -85,7 +84,6 @@ export class HeadlessGraphQLClient implements IHeadlessGraphQLClient {
             operationName: "GetGarageUnloads",
             variables: {
                 startingBlockIndex: blockIndex,
-                limit: 1,
             }
         });
 
@@ -163,19 +161,50 @@ export class HeadlessGraphQLClient implements IHeadlessGraphQLClient {
         return data.data.chainQuery.blockQuery.block.hash;
     }
 
-    async getNCGTransferredEvents(
-        blockHash: string,
-        recipient: Address | null = null
-    ): Promise<NCGTransferredEvent[]> {
-        const query = `query GetNCGTransferEvents($blockHash: ByteString!, $recipient: Address!)
-        { transferNCGHistories(blockHash: $blockHash, recipient: $recipient) { blockHash txId sender recipient amount memo } }`;
-        const { data } = await this.graphqlRequest({
-            operationName: "GetNCGTransferEvents",
-            query,
-            variables: { blockHash, recipient: recipient.toHex() },
-        });
+    async getAssetTransferredEvents(blockIndex: number, recipient: Address)
+        : Promise<AssetTransferredEvent[]> {
+            const query = `query GetAssetTransferred($blockIndex: Long!)
+            {             
+                transaction {
+                    ncTransactions(startingBlockIndex: $blockIndex, actionType: "transfer_asset*", limit: 1) {
+                        id
+                        actions {
+                            raw
+                        }
+                    }
+                }
+            }`;
+            const { data } = await this.graphqlRequest({
+                operationName: "GetAssetTransferred",
+                query,
+                variables: { 
+                    blockIndex,
+                },
+            });
 
-        return data.data.transferNCGHistories;
+            return data.data.transaction.ncTransactions.map(tx => {
+                const action = decode(Buffer.from(tx.actions[0].raw, "hex")) as Dictionary;
+                const values = (action.get("values") as BencodexDictionary);
+                const sender = Address.fromBytes(values.get("sender") as Buffer);
+                const recipientOnTx = Address.fromBytes(values.get("recipient") as Buffer);
+                const memo = values.get("memo") as string;
+                const [rawCurrency, rawValue] = values.get("amount") as [BencodexDictionary, bigint];
+                const amount:FungibleAssetValue = {
+                    currency: decodeCurrency(rawCurrency),
+                    rawValue,
+                };
+
+                if (!recipientOnTx.equals(recipient)) {
+                    return null;
+                }
+
+                return {
+                    sender,
+                    recipient,
+                    amount,
+                    memo,
+                };
+            }).filter(ev => ev !== null);
     }
     
     async getNextTxNonce(address: string): Promise<number> {
